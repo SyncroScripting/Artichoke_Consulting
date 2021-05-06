@@ -1,11 +1,11 @@
 <#
-# Script Name:              Install-Splashtop-Upgrade-Install.ps1
+# Script Name:              DeployAndManage-SplashtopStreamer.ps1
 # Script Author:            Peet McKinney @ Artichoke Consulting
 
 # Changelog                 
 2019.11.19                 Initial Checkin                 PJM
 2021.04.30                 Clean up, add direct download version check. add controls for ReqPassword 8 and UnLockUI 0 and AutoStart 1 PJM
-
+2021.05.06 				   Add Function Update-CloudAutoUpdate
 
 This script will download and deploy or upgrade Splashtop Streamer based on version and download URL defined in script.
 
@@ -14,6 +14,7 @@ Syncro Script Variables:
 Requires $Splashtop_DeployCode (Create Customer Custom Field "Text Field" for each DeployCode to be saved with each customer and map to the variable)
 Requires $Splashtop_ConnectURI_Syncro (Create a "Web link" Custom Asset Field and map to the variable)
 Requires $Splashtop_Name_Syncro (Create a "Text Field" Custom Asset Field and map to the variable)
+Requires $SplashtopUUID_Syncro (set to {{asset_custom_field_splashtop_uuid}})
 
 #>
 
@@ -26,18 +27,19 @@ Import-Module $env:SyncroModule
 
 ## Variables
 #  MUST_SET variables
-$MyCSRTeamName = "Your Deployment Team Name" #Found in Status window of Deployed Streamer under "Computer Deployed by"
-$Generic_DeployCode = "123456789012345678" #A Generic Deploy Code for you Team as fallback
+$MyCSRTeamName = "Your Team" #Found in Status window of Deployed Streamer under "Computer Deployed by"
+$Generic_DeployCode = "XXXXXXXXXXXX" #A Generic Deploy Code for you Team as fallback
 
 # SyncroMSP variables
-$Splashtop_ConnectURI_AssetField = "Field Name For SplashtopConnectURI" #Create a "Web link" Custom Asset Field and provide name here
-$SplashtopName_AssetField = "Field Name for Splashtop Computer Name"#Create a "Test field" Custom Asset Field and provide name here
+$Splashtop_ConnectURI_AssetField = "Splashtop Connect" #Create a "Web link" Custom Asset Field and provide name here
+$SplashtopName_AssetField = "Splashtop Name"#Create a "Test field" Custom Asset Field and provide name here
 
 # STS Settings variables 
 $IdleSessionTimeout_setting = "60" #You'd better have a timout in minutes
 $ReqPassword_setting = "8" #0 = No additional password, 4 = Security code (can't set security code through here), 8 = Windows login
 $UnLockUI_setting = "0" #0 = Lock if Standard User, 1 = Splashtop admin lock, 2 = No lock
 $AutoStart_setting = "1" #Ensures Autostart enabled
+$CloudAutoUpdate_setting = "1" #0 = Disable auto Streamer update, 1 = Enable auto Streamer update
 $NoTrayIcon_setting = "0" # 0 = Not hidden 1 = Hidden
 
 # "Static" variables: Here incase they need an update, Think before changing.
@@ -84,17 +86,17 @@ Function Install-Check{
   }
   if (!($InstalledVersion)){
     $global:InstallStatus = "NeedsInstall"
-    Write-Output "$ProgramName InstallStatus: $InstallStatus."    
+    Write-Output "$ProgramName InstallStatus: $InstallStatus"    
   }
     if (($CSRTeamName) -and ($MyCSRTeamName -ne $CSRTeamName)){
     $InstallStatus = "ReDeploy"
     Write-Output "Warning: CSRTeamName is not $MyCSRTeamName"
-    Write-Output "$ProgramName InstallStatus: $InstallStatus."
+    Write-Output "$ProgramName InstallStatus: $InstallStatus"
     Write-Output "Redeploying $ProgramName With $Splashtop_DeployCode"
   }
   if ($InstalledVersion -ge $CurrentVersion){
     $global:InstallStatus = "UpToDate"
-    Write-Output "$ProgramName InstallStatus: $InstallStatus."
+    Write-Output "$ProgramName InstallStatus: $InstallStatus"
   }
   if (!($CurrentVersion)){
     $global:InstallStatus = "MissingCurrentVersion"
@@ -103,7 +105,7 @@ Function Install-Check{
 }
 
 # Function to ensure $Splashtop_DeployCode is set 
-Function Check-DeployCode{
+Function Get-DeployCode{
   if (!($Splashtop_DeployCode)) {
     Write-Output "Deploy Code not set. Falling back to Generic Deploy Code ..."
     global:Splashtop_DeployCode = "$Generic_DeployCode"
@@ -120,7 +122,7 @@ Function Check-DeployCode{
     Write-Output "Warning: DeployCode `($DCode`) does not match provided DeployCode `($Splashtop_DeployCode`)"
     # Uncomment the next lines if you'd like to force a ReDeploy in this situation
     #$global:InstallStatus = "ReDeploy"
-    #Write-Output "$ProgramName InstallStatus: $InstallStatus."
+    #Write-Output "$ProgramName InstallStatus: $InstallStatus"
     #Write-Output "Redeploying $ProgramName With $Splashtop_DeployCode"
   }
 } 
@@ -179,8 +181,16 @@ Function Install-Redeploy{
 
 # Function update Splashtop ConnectURI in Syncro
 Function Update-ConnectURI{
-  $STUUID = (Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Splashtop Inc.\Splashtop Remote Server\").SUUID 
-  $Splashtop_ConnectURI_Local = "st-business://com.splashtop.business?uuid=$STUUID"
+  $SplashtopUUID = (Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Splashtop Inc.\Splashtop Remote Server\").SUUID 
+  $Splashtop_ConnectURI_Local = "st-business://com.splashtop.business?uuid=$SplashtopUUID"
+  if ($SplashtopUUID -ne $SplashtopUUID_Syncro ) {
+    Write-Output "Updating $ProgramName UUID for $CloudComputerName ..."
+    Write-Output "From $SplashtopUUID_Syncro"
+    Write-Output "To $SplashtopUUID"
+    Set-Asset-Field -Name "Splashtop UUID" -Value "$SplashtopUUID"
+    } else {
+    Write-Output "$ProgramName UUID`: $SplashtopUUID"
+    }
   if ($Splashtop_ConnectURI_Local -ne $Splashtop_ConnectURI_Syncro ) {
     Write-Output "Updating $ProgramName URI for $CloudComputerName ..."
     Write-Output "From $Splashtop_ConnectURI_Syncro"
@@ -247,6 +257,16 @@ Function Update-AutoStart{
   } 
 }
 
+#Function to update Splashtop CloudAutoUpdate
+Function Update-CloudAutoUpdate{
+  $CloudAutoUpdate = (Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Splashtop Inc.\Splashtop Remote Server\").CloudAutoUpdate 
+  if ($CloudAutoUpdate_setting -ne $CloudAutoUpdate){
+    Write-Output "Updating $ProgramName CloudAutoUpdate from $CloudAutoUpdate to $CloudAutoUpdate_setting."
+    New-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Splashtop Inc.\Splashtop Remote Server\" -Name "CloudAutoUpdate" -Value "$CloudAutoUpdate_setting" -PropertyType DWORD -Force | Out-Null
+    $global:RestartSTS = $true
+  } 
+}
+
 #Function to update Splashtop NoTrayIcon
 Function Update-NoTrayIcon{
   $NoTrayIcon = (Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Splashtop Inc.\Splashtop Remote Server\").NoTrayIcon 
@@ -270,7 +290,7 @@ Function Restart-Streamer{
  
 ##Main
 Install-Check
-Check-DeployCode
+Get-DeployCode
 if ($InstallStatus -eq "NeedsUpgrade") {
   Install-Upgrade
   Install-Check
@@ -290,6 +310,7 @@ if ($InstallStatus -eq "UpToDate" -or $InstallStatus -eq "MissingCurrentVersion"
   Update-ReqPassword
   Update-UnLockUI
   Update-AutoStart
+  Update-CloudAutoUpdate
   Update-NoTrayIcon
   Restart-Streamer
   Exit 0
