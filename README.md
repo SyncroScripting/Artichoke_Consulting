@@ -3,7 +3,7 @@ SyncroMSP Scripts by [Artichoke Consulting](https://artichoke.consulting). Montu
 
 ## macOS
 ### [#!/bin/bash](https://github.com/SyncroScripting/Artichoke_Consulting/tree/main/macOS/bash)
-**[macOS-RestartSyncroAgent.sh](https://github.com/SyncroScripting/Artichoke_Consulting/blob/main/macOS/bash/macOS-RestartSyncroAgent.sh)** - Since the macOS SyncroMSP Agent doesn't have a "Restart Agent" function, Here's one for you.
+**[macOS-RestartSyncroAgent.sh](https://github.com/SyncroScripting/Artichoke_Consulting/blob/main/macOS/bash/macOS-RestartSyncroAgent.sh)** - Since the macOS SyncroMSP Agent doesn't have a "Restart Agent" function, here's one for you.
 
 ## Windows 
 ### ps1
