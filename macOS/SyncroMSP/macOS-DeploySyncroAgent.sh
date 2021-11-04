@@ -6,54 +6,62 @@
 # Script Author:            Peet McKinney @ Artichoke Consulting
 
 # Changelog                 
-2021.05.01                 Initial Checkin                 PJM
+2021.05.01                 Initial Checkin            			      PJM
+2021.11.03                 Updated for Syncro's new token deployment  PJM
 
 #Desription
-Will automatically deploy SyncroMSP Agent given customerId policyid shopkey.
+Will automatically deploy SyncroMSP Agent given deploy token.
 
 CommentBlock-StartandEND
 
-### Usage: ./DeploySyncro.sh [-c customerId] [-p policyid] [-k shopkey] [-u Uninstall_if_Present <*true|false>] [-n noUI <*true|false>]
-### Tip: Find customerId, policyid, shopkey in your installer URL.
-### https://production.kabutoservices.com/desktop/macos/setup?customerId=11111&policyid=111111&shopkey=11111111111111111111111
-customerId="11111"
-policyid="111111"
-shopkey="11111111111111111111111"
-If_Present_Uninstall=false
+### Usage: ./macOS-DeploySyncroAgent.sh [-t token] [-u Uninstall_if_Present <*true|false>] [-n noUI <*true|false>]
+### Tip: Find customerId, policyid, shopkey in your installer URL. 
+### Tip: Record your Installer URL: 
+### Tip: formatted like this: https://production.kabutoservices.com/desktop/macos/setup?token=12345678-abcd-1234-abcd-1234567890ab
+
+
+token=
+If_Present_Uninstall=true
 noUI=true
 
-### Usage ###
-usage() 
-{
-	echo "Usage: $0 [-c customerId] [-p policyid] [-k shopkey] [-u Uninstall_if_Present <*true|false>] [-n noUI <*true|false>]" 1>&2
-	echo "Tip: Find customerId, policyid, shopkey in your installer URL." 1>&2
-	echo "Tip: Hardcode variables in script if prefered." 1>&2
-	
-	exit 1
-}
 ### Stupid simple log
 LogIt() 
 {
 	echo $(date +%Y-%m-%d_%H:%M:%S): ${*}
 }
 
+### Usage ###
+usage() 
+{
+	echo "Usage: $0 
+	[-t token <12345678-abcd-1234-abcd-1234567890ab>] 
+	[-u Uninstall_if_Present <*true|false>] 
+	[-n noUI <*true|false>]" 1>&2
+	echo "Tip: Find token in your installer URL." 1>&2
+	echo "Tip: Hardcode variables in script if prefered." 1>&2
+	
+	exit 1
+}
+
+### check running as root
+if [[ $EUID -ne 0 ]]; then
+   echo "Usage: This script must be run as root." 1>&2
+   usage
+fi
+
 ### use flags ###
-while getopts c:p:k:u:n: option
+while getopts t:u:n: option
 do
 	case "${option}"
 		in
-		c) customerId=${OPTARG};;
-		p) policyid=${OPTARG};;
-		k) shopkey=${OPTARG};;
+		t) token=${OPTARG};;
 		u) If_Present_Uninstall=${OPTARG};;
 		n) noUI=${OPTARG};;
 		*) usage;;
 	esac
 done
 
-### check running as root
-if [[ $EUID -ne 0 ]]; then
-   echo "Usage: This script must be run as root." 1>&2
+if [ -z "$token" ]; then
    usage
 fi
 
@@ -80,7 +88,7 @@ fi
 TEMP_DIR=$(mktemp -d /tmp/SyncroDeploy-XXXXXXXXXXXXXX)
 cd $TEMP_DIR
 LogIt "Start: Download SyncroMSP installer package."
-curl -s -OJ "https://desktop-updates.kabutoservices.com/api/v1/get-installer/macos?customerId=$customerId&policyid=$policyid&shopkey=$shopkey"
+curl -s -L -OJ "https://production.kabutoservices.com/desktop/macos/setup?token=$token"
 SYNCRO_PKG=$(ls $TEMP_DIR)
 LogIt "End: Download SyncroMSP installer package."
 LogIt "Start: Installing SyncroMSP installer package - $SYNCRO_PKG."
