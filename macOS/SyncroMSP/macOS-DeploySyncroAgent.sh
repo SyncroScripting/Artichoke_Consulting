@@ -6,8 +6,9 @@
 # Script Author:            Peet McKinney @ Artichoke Consulting
 
 # Changelog                 
-2021.05.01                 Initial Checkin            			      PJM
-2021.11.03                 Updated for Syncro's new token deployment  PJM
+2021.05.01                 Initial Checkin            			              PJM
+2021.11.03                 Updated for Syncro's new token deployment          PJM
+2021.11.04                 Defualts to not reinstalling if already installed  PJM
 
 #Desription
 Will automatically deploy SyncroMSP Agent given deploy token.
@@ -19,10 +20,15 @@ CommentBlock-StartandEND
 ### Tip: Record your Installer URL: 
 ### Tip: formatted like this: https://production.kabutoservices.com/desktop/macos/setup?token=12345678-abcd-1234-abcd-1234567890ab
 
-
+### Variables ###
+# Hard code what you'd like
 token=
 If_Present_Uninstall=true
 noUI=true
+reinstall=false
+
+#runtime
+version=$(defaults read "/Library/Application Support/SyncroMSP/SyncroMSP.app/Contents/Info.plist" CFBundleVersion)
 
 ### Stupid simple log
 LogIt() 
@@ -35,6 +41,7 @@ usage()
 {
 	echo "Usage: $0 
 	[-t token <12345678-abcd-1234-abcd-1234567890ab>] 
+	[-r reinstall <true|*false>] 
 	[-u Uninstall_if_Present <*true|false>] 
 	[-n noUI <*true|false>]" 1>&2
 	echo "Tip: Find token in your installer URL." 1>&2
@@ -50,11 +57,12 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 ### use flags ###
-while getopts t:u:n: option
+while getopts t:r:u:n: option
 do
 	case "${option}"
 		in
 		t) token=${OPTARG};;
+		r) reinstall=${OPTARG};;
 		u) If_Present_Uninstall=${OPTARG};;
 		n) noUI=${OPTARG};;
 		*) usage;;
@@ -63,6 +71,11 @@ done
 
 if [ -z "$token" ]; then
    usage
+fi
+
+if [ $reinstall == "false" ] && [ "$version" ]; then
+   LogIt "Skipping Deployment: SyncroMSP Agent v.$version already installed"
+   exit 0
 fi
 
 ### Uninstall
@@ -78,7 +91,7 @@ if ($If_Present_Uninstall eq "false") && [ -f "/Library/Application Support/Sync
 fi
 	
 
-#### Suppress UI
+### Suppress UI
 if ($noUI eq "true"); then
 	LogIt "Disabling Screen Recording entitlement request."
 	touch /tmp/syncro-noui
