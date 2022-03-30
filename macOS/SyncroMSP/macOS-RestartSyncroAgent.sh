@@ -29,7 +29,7 @@ cat << EOF > "$ScriptFolder/macOS-RestartSyncroAgent.sh"
 
 ## Runtime Variables
 loggedInUser=$( scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/ && ! /loginwindow/ { print $3 }' )
-UID=\$(id -u "\$loggedInUser")
+UID=$(id -u "\$loggedInUser")
 
 ##Main
 sleep 5
